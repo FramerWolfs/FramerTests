@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Учебный хаб Фрама</title>
+  <meta name="description" content="Одностраничный учебный хаб: задачи, помодоро-таймер, заметки с autosave. Работает офлайн (localStorage)." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🐺</text></svg>">
+  <style>
+    :root{
+      --bg: #0b0f14;
+      --panel: #111823;
+      --text: #e6eef8;
+      --muted: #9bb1c9;
+      --accent: #6ee7ff;
+      --accent-2: #7c5cff;
+      --danger: #ff6b6b;
+      --good: #66e6a8;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,.25), transparent 60%),
+                  radial-gradient(900px 450px at -10% 10%, rgba(110,231,255,.2), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      line-height:1.5;
+    }
+    a{color: var(--accent)}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    header{
+      position:sticky;top:0;z-index:50;backdrop-filter: blur(8px);
+      background: linear-gradient(180deg, rgba(11,15,20,.9), rgba(11,15,20,.6));
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .nav{display:flex;align-items:center;justify-content:space-between}
+    .brand{display:flex;gap:12px;align-items:center;font-weight:800;letter-spacing:.2px}
+    .brand .logo{width:36px;height:36px;border-radius:12px;display:grid;place-content:center;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow: var(--shadow);}
+    .nav a{margin-left:16px;text-decoration:none;color:var(--muted)}
+    .nav a:hover{color:var(--text)}
+    .theme-toggle{border:1px solid rgba(255,255,255,.08);padding:8px 12px;border-radius:999px;background:transparent;color:var(--muted);cursor:pointer}
+
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center;padding:28px 0}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .card .inner{padding:22px}
+    .big{font-size:44px;line-height:1.1;margin:0 0 10px}
+    .muted{color:var(--muted)}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.1);padding:6px 10px;border-radius:999px;font-size:12px;color:var(--muted)}
+    .cta{margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
+    .btn{border:none;padding:12px 16px;border-radius:12px;cursor:pointer;font-weight:700}
+    .btn.primary{background:linear-gradient(135deg,var(--accent-2),var(--accent));color:#081018}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.1);color:var(--text)}
+    .grid{display:grid;gap:22px}
+    
+    @media (max-width: 900px){
+      .hero{grid-template-columns:1fr}
+    }
+
+    section{margin:28px 0}
+    h2{margin:0 0 12px;font-size:24px}
+
+    /* Tasks */
+    .tasks{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+    @media (max-width: 820px){.tasks{grid-template-columns:1fr}}
+    .task-list{max-height:360px;overflow:auto;padding-right:8px}
+    .task{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:10px 12px;border-radius:12px;margin-bottom:10px}
+    .task .meta{display:flex;align-items:center;gap:10px}
+    .task small{color:var(--muted)}
+    .task.done{opacity:.6;text-decoration:line-through}
+    .controls{display:flex;gap:8px}
+    .chip{font-size:12px;border:1px solid rgba(255,255,255,.1);padding:3px 8px;border-radius:999px;color:var(--muted)}
+
+    /* Pomodoro */
+    .timer{display:grid;place-items:center;padding:10px 0}
+    .clock{font-size:56px;font-weight:800;letter-spacing:1px}
+    .timer .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field input{width:90px;background:transparent;border:1px solid rgba(255,255,255,.12);padding:10px;border-radius:10px;color:var(--text)}
+
+    /* Notes */
+    .notes-wrap{display:grid;grid-template-columns:1fr;gap:10px}
+    .notes{width:100%;min-height:220px;max-height:480px;padding:14px;border-radius:12px;background:#0e141c;border:1px solid rgba(255,255,255,.1);color:var(--text);resize:vertical}
+
+    /* Footer */
+    footer{opacity:.8;text-align:center;padding:18px 0;color:var(--muted)}
+
+    .hint{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <div class="brand">
+        <div class="logo">⚡</div>
+        <div>Учебный хаб Фрама</div>
+      </div>
+      <nav>
+        <a href="#tasks">Задачи</a>
+        <a href="#pomodoro">Помодоро</a>
+        <a href="#notes">Заметки</a>
+        <button class="theme-toggle" id="themeToggle" title="Переключить тему">Тема</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="card">
+        <div class="inner">
+          <div class="pill">🛠️ Полезно для учёбы и проектов</div>
+          <h1 class="big">Всё для продуктивности — в одной вкладке</h1>
+          <p class="muted">Планируй задачи, работай по методу Помодоро, записывай идеи. Всё сохраняется в твоём браузере (localStorage) и работает офлайн.</p>
+          <div class="cta">
+            <a class="btn primary" href="#tasks">Добавить задачу</a>
+            <a class="btn ghost" href="#notes">Открыть заметки</a>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="inner">
+          <h2>Коротко о сайте</h2>
+          <ul class="muted">
+            <li>✅ Без серверов и сборки — один файл <code>index.html</code></li>
+            <li>💾 Автосохранение: задачи, настройки таймера, заметки</li>
+            <li>🌓 Тёмная/светлая тема</li>
+            <li>📤 Экспорт/импорт данных (JSON) для бэкапа</li>
+          </ul>
+          <p class="hint">Совет: залей этот файл на GitHub Pages — и у тебя будет рабочий сайт.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="tasks" class="grid tasks">
+      <div class="card">
+        <div class="inner">
+          <h2>Задачи</h2>
+          <form id="taskForm" class="row" autocomplete="off" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <input id="taskText" type="text" placeholder="Что нужно сделать?" required style="flex:1;min-width:220px;background:transparent;border:1px solid rgba(255,255,255,.12);padding:10px;border-radius:10px;color:var(--text)" />
+            <select id="taskTag" style="background:transparent;border:1px solid rgba(255,255,255,.12);padding:10px;border-radius:10px;color:var(--text)">
+              <option value="Учёба">Учёба</option>
+              <option value="Проект">Проект</option>
+              <option value="Личное">Личное</option>
+            </select>
+            <button class="btn primary" type="submit">Добавить</button>
+            <button class="btn ghost" type="button" id="clearDone">Очистить выполненные</button>
+          </form>
+          <div class="task-list" id="taskList"></div>
+          <div class="hint">Подсказка: кликай по чекбоксу чтобы отметить выполнение. Данные сохраняются автоматически.</div>
+        </div>
+      </div>
+
+      <div class="card" id="pomodoro">
+        <div class="inner">
+          <h2>Помодоро-таймер</h2>
+          <div class="timer">
+            <div class="clock" id="clock">25:00</div>
+            <div class="row" style="margin:10px 0 16px">
+              <button class="btn primary" id="start">Старт</button>
+              <button class="btn ghost" id="pause">Пауза</button>
+              <button class="btn ghost" id="reset">Сброс</button>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="workMins">Фокус (мин)</label>
+                <input id="workMins" type="number" min="1" max="120" value="25" />
+              </div>
+              <div class="field">
+                <label for="breakMins">Перерыв (мин)</label>
+                <input id="breakMins" type="number" min="1" max="60" value="5" />
+              </div>
+              <div class="field">
+                <label for="longBreakMins">Длинный (мин)</label>
+                <input id="longBreakMins" type="number" min="5" max="90" value="15" />
+              </div>
+              <div class="field">
+                <label for="cycles">Циклов до длинного</label>
+                <input id="cycles" type="number" min="1" max="10" value="4" />
+              </div>
+            </div>
+            <div class="hint" style="margin-top:8px">Таймер мигает и звенит при окончании интервала. Настройки сохраняются.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="notes" class="card">
+      <div class="inner notes-wrap">
+        <h2>Заметки</h2>
+        <textarea id="notes" class="notes" placeholder="Пиши что угодно: конспекты, идеи, планы..."></textarea>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn ghost" id="exportData">Экспорт данных</button>
+          <label class="btn ghost" for="importFile" style="cursor:pointer">Импорт данных</label>
+          <input type="file" id="importFile" accept="application/json" style="display:none" />
+          <button class="btn" id="wipeAll" style="background:transparent;border:1px solid rgba(255,255,255,.15);color:var(--danger)">Стереть всё (осторожно)</button>
+        </div>
+        <p class="hint">Экспортирует/импортирует список задач, заметки и настройки таймера в один JSON-файл.</p>
+      </div>
+    </section>
+
+    <footer>
+      Сделано Фрамом • <span id="year"></span> • Без библиотек, без сборки — просто HTML, CSS и JS
+    </footer>
+  </main>
+
+<script>
+(function(){
+  const qs = s=>document.querySelector(s);
+  const qsa = s=>Array.from(document.querySelectorAll(s));
+  const store = {
+    get(k,def){ try{ const v = localStorage.getItem(k); return v? JSON.parse(v): def }catch(e){ return def } },
+    set(k,v){ localStorage.setItem(k, JSON.stringify(v)) },
+    del(k){ localStorage.removeItem(k) }
+  };
+  // THEME
+  const themeToggle = qs('#themeToggle');
+  const prefers = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light':'dark';
+  const savedTheme = store.get('theme', prefers);
+  applyTheme(savedTheme);
+  themeToggle.addEventListener('click', ()=>{
+    const t = document.documentElement.dataset.theme === 'light'? 'dark':'light';
+    applyTheme(t); store.set('theme', t);
+  });
+  function applyTheme(t){
+    document.documentElement.dataset.theme = t;
+    if(t==='light'){
+      document.documentElement.style.setProperty('--bg','#f6f9fc');
+      document.documentElement.style.setProperty('--panel','#ffffff');
+      document.documentElement.style.setProperty('--text','#0b1220');
+      document.documentElement.style.setProperty('--muted','#52607a');
+      document.documentElement.style.setProperty('--shadow','0 10px 30px rgba(0,0,0,.06)');
+    } else {
+      document.documentElement.style.removeProperty('--bg');
+      document.documentElement.style.removeProperty('--panel');
+      document.documentElement.style.removeProperty('--text');
+      document.documentElement.style.removeProperty('--muted');
+      document.documentElement.style.removeProperty('--shadow');
+    }
+  }
+
+  // YEAR
+  qs('#year').textContent = new Date().getFullYear();
+
+  // TASKS
+  const taskForm = qs('#taskForm');
+  const taskList = qs('#taskList');
+  const taskText = qs('#taskText');
+  const taskTag = qs('#taskTag');
+  const clearDone = qs('#clearDone');
+  let tasks = store.get('tasks', []);
+
+  function renderTasks(){
+    taskList.innerHTML = '';
+    tasks.sort((a,b)=> Number(a.done) - Number(b.done));
+    tasks.forEach((t,i)=>{
+      const el = document.createElement('div');
+      el.className = 'task' + (t.done? ' done':'');
+      el.innerHTML = `
+        <div class="meta">
+          <input type="checkbox" ${t.done? 'checked':''} aria-label="Готово" />
+          <div>
+            <div>${escapeHtml(t.text)}</div>
+            <small>${new Date(t.created).toLocaleString()} · <span class="chip">${escapeHtml(t.tag)}</span></small>
+          </div>
+        </div>
+        <div class="controls">
+          <button title="Редактировать" class="btn ghost edit">✏️</button>
+          <button title="Удалить" class="btn ghost del">🗑️</button>
+        </div>`;
+      const [chk, editBtn, delBtn] = [el.querySelector('input'), el.querySelector('.edit'), el.querySelector('.del')];
+      chk.addEventListener('change', ()=>{ tasks[i].done = chk.checked; saveTasks(); });
+      delBtn.addEventListener('click', ()=>{ tasks.splice(i,1); saveTasks(); });
+      editBtn.addEventListener('click', ()=>{
+        const newText = prompt('Измени текст задачи:', t.text);
+        if(newText!==null){ tasks[i].text = newText.trim(); saveTasks(); }
+      });
+      taskList.appendChild(el);
+    });
+  }
+  function saveTasks(){ store.set('tasks', tasks); renderTasks(); }
+  function escapeHtml(str){ return str.replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s])) }
+
+  taskForm.addEventListener('submit', e=>{
+    e.preventDefault();
+    const text = taskText.value.trim();
+    if(!text) return;
+    tasks.push({ text, tag: taskTag.value, done:false, created: Date.now() });
+    taskText.value=''; saveTasks();
+  });
+  clearDone.addEventListener('click', ()=>{ tasks = tasks.filter(t=>!t.done); saveTasks(); });
+
+  renderTasks();
+
+  // POMODORO
+  const clock = qs('#clock');
+  const startBtn = qs('#start');
+  const pauseBtn = qs('#pause');
+  const resetBtn = qs('#reset');
+  const workMins = qs('#workMins');
+  const breakMins = qs('#breakMins');
+  const longBreakMins = qs('#longBreakMins');
+  const cycles = qs('#cycles');
+
+  const savedTimer = store.get('pomodoro', {work:25, brk:5, long:15, cycles:4});
+  workMins.value = savedTimer.work; breakMins.value = savedTimer.brk; longBreakMins.value = savedTimer.long; cycles.value = savedTimer.cycles;
+  let state = { mode:'work', remaining: savedTimer.work*60, cycle:0, running:false, interval:null };
+  updateClock();
+
+  function saveTimerCfg(){ store.set('pomodoro', {work:Number(workMins.value), brk:Number(breakMins.value), long:Number(longBreakMins.value), cycles:Number(cycles.value)}); }
+  [workMins, breakMins, longBreakMins, cycles].forEach(inp=> inp.addEventListener('change', ()=>{ saveTimerCfg(); if(!state.running){ state.remaining = Number(workMins.value)*60; state.mode='work'; updateClock(); }}));
+
+  startBtn.addEventListener('click', ()=>{ if(state.running) return; state.running=true; tick(); state.interval = setInterval(tick, 1000); });
+  pauseBtn.addEventListener('click', ()=>{ state.running=false; clearInterval(state.interval); });
+  resetBtn.addEventListener('click', ()=>{ state.running=false; clearInterval(state.interval); state.mode='work'; state.cycle=0; state.remaining=Number(workMins.value)*60; updateClock(true); });
+
+  function tick(){
+    if(state.remaining>0){ state.remaining--; updateClock(); return; }
+    // interval finished
+    flash(); beep();
+    if(state.mode==='work'){
+      state.cycle++;
+      if(state.cycle % Number(cycles.value) === 0){ state.mode='long'; state.remaining = Number(longBreakMins.value)*60; }
+      else { state.mode='break'; state.remaining = Number(breakMins.value)*60; }
+    } else {
+      state.mode='work'; state.remaining = Number(workMins.value)*60;
+    }
+    updateClock(true);
+  }
+  function updateClock(pulse){
+    const m = String(Math.floor(state.remaining/60)).padStart(2,'0');
+    const s = String(state.remaining%60).padStart(2,'0');
+    clock.textContent = `${m}:${s}`;
+    clock.style.transform = pulse? 'scale(1.04)': 'scale(1)';
+    setTimeout(()=> clock.style.transform='scale(1)', 120);
+  }
+  function flash(){
+    document.body.animate([{filter:'brightness(1.2)'},{filter:'brightness(1)'}], {duration:400, iterations:1});
+  }
+  function beep(){
+    try{
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type='sine'; o.frequency.setValueAtTime(880, ctx.currentTime);
+      o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.3);
+      o.start(); o.stop(ctx.currentTime+0.31);
+    }catch(e){ /* no audio */ }
+  }
+
+  // NOTES
+  const notes = qs('#notes');
+  notes.value = store.get('notes','');
+  let notesSaveTimer = null;
+  notes.addEventListener('input', ()=>{
+    clearTimeout(notesSaveTimer);
+    notesSaveTimer = setTimeout(()=> store.set('notes', notes.value), 200);
+  });
+
+  // EXPORT / IMPORT / WIPE
+  function download(filename, text){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], {type:'application/json'}));
+    a.download = filename; a.click();
+    setTimeout(()=> URL.revokeObjectURL(a.href), 2000);
+  }
+  qs('#exportData').addEventListener('click', ()=>{
+    const data = {
+      tasks,
+      notes: notes.value,
+      pomodoro: store.get('pomodoro', {work:25, brk:5, long:15, cycles:4}),
+      theme: store.get('theme','dark')
+    };
+    download('fram-hub-backup.json', JSON.stringify(data, null, 2));
+  });
+  qs('#importFile').addEventListener('change', (e)=>{
+    const f = e.target.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const data = JSON.parse(reader.result);
+        tasks = Array.isArray(data.tasks)? data.tasks: tasks;
+        store.set('tasks', tasks);
+        notes.value = String(data.notes||''); store.set('notes', notes.value);
+        if(data.pomodoro){ store.set('pomodoro', data.pomodoro); workMins.value=data.pomodoro.work; breakMins.value=data.pomodoro.brk; longBreakMins.value=data.pomodoro.long; cycles.value=data.pomodoro.cycles; }
+        if(data.theme){ store.set('theme', data.theme); applyTheme(data.theme); }
+        renderTasks(); updateClock(true);
+        alert('Импорт завершён ✅');
+      }catch(err){ alert('Не удалось импортировать файл :('); }
+    };
+    reader.readAsText(f);
+  });
+  qs('#wipeAll').addEventListener('click', ()=>{
+    if(confirm('Это удалит все данные (задачи, заметки, настройки). Ты уверен?')){
+      localStorage.clear(); tasks=[]; renderTasks(); notes.value='';
+      workMins.value=25; breakMins.value=5; longBreakMins.value=15; cycles.value=4; updateClock(true);
+      alert('Данные удалены.');
+    }
+  });
+})();
+</script>
+</body>
+</html>
